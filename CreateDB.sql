@@ -8,3 +8,9 @@
   parent_id varchar,
   foreign key (parent_id) references disk_tree(id) on delete cascade
 );
+
+create table node_history (
+  id varchar,
+  content jsonb,
+  date timestamptz
+);

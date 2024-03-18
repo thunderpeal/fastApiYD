@@ -4,8 +4,8 @@ from fastapi.exceptions import RequestValidationError, HTTPException
 from datetime import datetime
 from core.nodes_repository import NodesRepository
 from core.helpers import update_parent
-from typing import Union
 import os
+import json
 
 from models.models import (
     SystemItem,
@@ -125,8 +125,16 @@ async def get_nodes_id(id: str):
 
 
 @router.get('/node/{id}/history', response_model=SystemItemHistoryResponse)
-async def get_node_id_history(id, date_start, date_end) -> Union[SystemItemHistoryResponse, None]:
-    pass
+async def get_node_id_history(id:str, date_start: datetime, date_end: datetime) -> SystemItemHistoryResponse:
+    node = await database.read_node({'id': id})
+    if node is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    query_values = {'id': id, 'date_start': date_start, 'date_end': date_end}
+    nodes = await database.get_history_per_node(query_values)
+    nodes_dicts = [json.loads(dict(node._mapping)['content']) for node in nodes]
+    items = [SystemItemHistoryUnit(id=node['id'], type=node['type'], url=node['url'], size=node['size'],
+                                   date=node['date'], parentId=node['parent_id']) for node in nodes_dicts]
+    return SystemItemHistoryResponse(items=items)
 
 
 @router.get('/updates', response_model=SystemItemHistoryResponse)

@@ -1,6 +1,8 @@
 from core.repository import Repository
 from databases import Database
 import logging
+import json
+from core.helpers import json_serial
 from datetime import timedelta
 from fastapi import HTTPException
 
@@ -33,8 +35,9 @@ class NodesRepository(Repository):
         try:
             node_id = await self._connection.execute(query=query, values=query_values)
             logging.info(f"Successfully added node {node_id}")
+            await self.bump_node_to_history(query_values)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to add node {id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to add node {id_to_add}: {e}")
 
     async def read_node(self, query_values):
         id_to_read = query_values['id']
@@ -85,6 +88,7 @@ class NodesRepository(Repository):
         try:
             await self._connection.execute(query=query, values=values)
             logging.info(f"Successfully updated node {id_to_update}")
+            await self.bump_node_to_history(query_values)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to update node {id_to_update} from database: {e}")
 
@@ -110,3 +114,36 @@ class NodesRepository(Repository):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to fetch history 24H back from {date}: {e}")
         return nodes
+
+    async def node_to_history(self, query_values):
+        id_to_add = query_values['id']
+        logging.info(f"Attempting to put node {id_to_add} to history")
+
+        query = "INSERT INTO node_history (id, content, date) " \
+                "VALUES (:id, :content, :date) RETURNING id"
+
+        try:
+            node_id = await self._connection.execute(query=query, values=query_values)
+            logging.info(f"Successfully put node {node_id} to history")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to put node {id_to_add} to history: {e}")
+
+    async def bump_node_to_history(self, query_values):
+        query_values['parentId'] = query_values['parent_id']
+        if 'full_route' in query_values:
+            del query_values['full_route']
+        history_json = json.dumps(query_values, default=json_serial)
+        query_value_history = {'id': query_values['id'], 'content': history_json, 'date': query_values['date']}
+        await self.node_to_history(query_value_history)
+
+    async def get_history_per_node(self, query_values):
+        id_to_find = query_values['id']
+        logging.info(f"Attempting to get history for element {id_to_find}")
+        query = "SELECT * FROM node_history WHERE id = :id and (date <= :date_end and date >= :date_start)"
+        try:
+            nodes = await self._connection.fetch_all(query=query, values=query_values)
+            logging.info(f"Successfully fetched history for element {id_to_find}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch history for element {id_to_find}: {e}")
+        return nodes
+

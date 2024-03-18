@@ -37,3 +37,11 @@ class Repository(ABC):
     @abstractmethod
     async def updates_till_date(self, query_values):
         pass
+
+    @abstractmethod
+    async def node_to_history(self, query_values):
+        pass
+
+    @abstractmethod
+    async def bump_node_to_history(self, query_values):
+        pass
