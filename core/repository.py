@@ -45,3 +45,7 @@ class Repository(ABC):
     @abstractmethod
     async def bump_node_to_history(self, query_values):
         pass
+
+    @abstractmethod
+    async def get_history_per_node(self, query_values):
+        pass
