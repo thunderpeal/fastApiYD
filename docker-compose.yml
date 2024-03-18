@@ -1,0 +1,30 @@
+services:
+    db:
+        container_name: "yd-postgres"
+        build:
+            context: .
+            dockerfile: Dockerfile-postgres
+        image: "yd-postgres:latest"
+        ports:
+            - "5432:5432"
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+    fastapi:
+        container_name: "yd-fastapi"
+        environment:
+            - database_url=postgresql://postgres:postgres@db:5432/postgres
+        build:
+            context: .
+            dockerfile: Dockerfile-fastapi
+        ports:
+            - "80:80"
+        image: "yd-fastapi:latest"
+        depends_on:
+            db:
+                condition: service_healthy
+                restart: true
+        links:
+            - db
